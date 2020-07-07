@@ -1,23 +1,59 @@
-import React from 'react';
-import logo from './logo.svg';
+import React, {useEffect, useState} from 'react';
+import {
+  Typography,
+  makeStyles,
+  Card,
+  CardHeader,
+  CardContent,
+  Button,
+  Box,
+  Divider,
+ } from '@material-ui/core';
 import './App.css';
+import {
+  listener,
+  startTablet,
+} from "./SigWeb";
+
+
+const useStyles = makeStyles((theme) => ({
+  root: {},
+  card: {
+    boxShadow: theme.shadows[5],
+    outline: 'none'
+  },
+
+}));
 
 function App() {
+  const classes = useStyles();
+
+  listener()
+
   return (
     <div className="App">
       <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
+        <Card
+          className={classes.card}
+          align='center'
         >
-          Learn React
-        </a>
+          <CardHeader title='Capture Signature' />
+          <Divider/>
+          <CardContent>
+            <Box p={5}>
+              <canvas id="cnv" name="cnv" width="500" height="100" />
+            </Box>
+            <form action="#" name="FORM1">
+              <Button onClick={() => startTablet()}>
+                Sign
+              </Button>
+              <Typography variant='body1'>
+                Please have customer sign signature pad.
+              </Typography>
+              <textarea name="sigString" rows="20" cols="50">SigString: </textarea>
+            </form>
+          </CardContent>
+        </Card>
       </header>
     </div>
   );
