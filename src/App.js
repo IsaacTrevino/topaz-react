@@ -25,6 +25,12 @@ const useStyles = makeStyles((theme) => ({
 
 }));
 
+// sdk
+// https://www.topazsystems.com/web.html
+
+// installer
+// https://www.topazsystems.com/software/sigweb.exe
+
 function App() {
   const classes = useStyles();
 
