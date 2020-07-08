@@ -54,17 +54,8 @@ export function startTablet()
     {
       var ctx = document.getElementById('cnv').getContext('2d');
       eventTmr = setInterval( SigWebEvent, 20 );
-      
-      if(tmr == null)
-      {
-        tmr = SetTabletState(1, ctx, 50);
-      }
-      else
-      {
-        SetTabletState(0, tmr);
-        tmr = null;
-        tmr = SetTabletState(1, ctx, 50);
-      }
+      console.log(eventTmr)
+      tmr = SetTabletState(1, ctx, 50) || tmr;
       SetLCDCaptureMode(2);
       document.FORM1.sigString.value = "SigString: ";
       LcdRefresh(0, 0, 0, 240, 64);
@@ -309,6 +300,7 @@ function endDemo()
   SetTabletState(0, tmr);
   ClearTablet();
 }
+
 function close(){
   if(resetIsSupported){
     Reset();
