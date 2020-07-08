@@ -23,7 +23,7 @@ import {
   SetLCDCaptureMode,
   LcdRefresh,
   ClearSigWindow,
-  LCDSendGraphicUrl,
+  LcdWriteLocalImage,
   LCDGetLCDSize,
   KeyPadQueryHotSpot,
   LCDWriteString,
@@ -46,9 +46,8 @@ export function startTablet()
 {
   try
   {
-    var retmod = 0;
     SetTabletState(1);
-    retmod = TabletModelNumber();
+    let retmod = TabletModelNumber();
     SetTabletState(0);
     if(retmod == 11 || retmod == 12 || retmod == 15)
     {
@@ -77,9 +76,9 @@ export function startTablet()
       SetImageYSize(100);
       SetLCDCaptureMode(2);
 
-      LCDSendGraphicUrl(1, 2, 0, 20, "/images/Sign.bmp");
-      LCDSendGraphicUrl(1, 2, 207, 4, "/images/OK.bmp");
-      LCDSendGraphicUrl(1, 2, 15, 4, "/images/CLEAR.bmp");
+      LcdWriteLocalImage(1, 2, 0, 20, "/images/Sign.bmp");
+      LcdWriteLocalImage(1, 2, 207, 4, "/images/OK.bmp");
+      LcdWriteLocalImage(1, 2, 15, 4, "/images/CLEAR.bmp");
 
       lcdSize = LCDGetLCDSize();
       lcdX = lcdSize & 0xffff;
@@ -96,12 +95,13 @@ export function startTablet()
       ClearTablet();
 
       LCDSetWindow(0, 0, 1, 1);
-      SetSigWindow(1, 0, 0, 1, 1);
+      SetSigWindow(1, 0, 0, 1, 1);  
       SetLCDCaptureMode(2);
 
       scrn = 1;
 
-      processPenUp();
+      while(1)
+        processPenUp();
 
       //onSigPenUp = function ()
       //{
@@ -241,7 +241,8 @@ function processPenUp()
     else
     {
       LcdRefresh(0, 0, 0, 240, 64);
-      LCDSendGraphicUrl(0, 2, 4, 20, "http://www.sigplusweb.com/SigWeb/please.bmp");
+      LCDWriteString(0, 2, 4, 20, "9pt Arial", 15, "Please");
+      //LCDSendGraphicUrl(0, 2, 4, 20, "http://www.sigplusweb.com/SigWeb/please.bmp");
       ClearTablet();
       LcdRefresh(2, 0, 0, 240, 64);
       SetLCDCaptureMode(2);
