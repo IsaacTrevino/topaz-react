@@ -1,38 +1,4 @@
-import {
-  IsSigWebInstalled,
-  SetDisplayXSize,
-  SetDisplayYSize,
-  SetTabletState,
-  SetJustifyMode,
-  ClearTablet,
-  NumberOfTabletPoints,
-  SetSigCompressionMode,
-  GetSigString,
-  SetImageXSize,
-  SetImageYSize,
-  Reset,
-  GetSigWebVersion,
-  AutoKeyAddANSIData,
-  SetEncryptionMode,
-  SetSigWindow,
-  LCDSetWindow,
-  KeyPadAddHotSpot,
-  KeyPadClearHotSpotList,
-  TabletModelNumber,
-  SigWebEvent,
-  SetLCDCaptureMode,
-  LcdRefresh,
-  ClearSigWindow,
-  LcdWriteLocalImage,
-  LCDGetLCDSize,
-  KeyPadQueryHotSpot,
-  LCDWriteString,
-  LCDStringWidth,
-  LCDStringHeight,
-  SetImagePenWidth, //<--
-  GetSigImageB64, //<--
-  SetKeyString,//<--
- } from "./SigWebTablet";
+
 
 
 var tmr;
@@ -40,266 +6,179 @@ var eventTmr;
 
 var resetIsSupported = false;
 let lcdSize, lcdX, lcdY, scrn;
+let ctx, x = 500, y = 100;
 
-
-export function startTablet()
+export function onSign(setStartDisable)
 {
-  try
-  {
-    SetTabletState(1);
-    let retmod = TabletModelNumber();
-    SetTabletState(0);
-    if(retmod == 11 || retmod == 12 || retmod == 15)
-    {
-      var ctx = document.getElementById('cnv').getContext('2d');
-      eventTmr = setInterval( SigWebEvent, 20 );
-      console.log(eventTmr)
-      tmr = SetTabletState(1, ctx, 50) || tmr;
-      SetLCDCaptureMode(2);
-      document.FORM1.sigString.value = "SigString: ";
-      LcdRefresh(0, 0, 0, 240, 64);
-      SetJustifyMode(0);
-      KeyPadClearHotSpotList();
-      ClearSigWindow(1);
-      SetDisplayXSize(500);
-      SetDisplayYSize(100);
-      SetImageXSize(500);
-      SetImageYSize(100);
-      SetLCDCaptureMode(2);
+  if(IsSigWebInstalled()){
+    ctx = document.getElementById('cnv').getContext('2d');
+    document.FORM1.sigStringData.value = "SigString: ";
+    document.FORM1.sigImageData.value = 'Base64 String: ';
+    SetDisplayXSize( x );
+    SetDisplayYSize( y );
+    SetTabletState(0, tmr);
+    SetJustifyMode(0);
 
-      LcdWriteLocalImage(1, 2, 0, 20, "/images/Sign.bmp");
-      LcdWriteLocalImage(1, 2, 207, 4, "/images/OK.bmp");
-      LcdWriteLocalImage(1, 2, 15, 4, "/images/CLEAR.bmp");
+    SetKeyString("0000000000000000");
+    SetEncryptionMode(0);
+    tmr = SetTabletState(1, ctx, 50) || tmr;
+    eventTmr = setInterval( SigWebEvent, 20 );
 
-      lcdSize = LCDGetLCDSize();
-      lcdX = lcdSize & 0xffff;
-      lcdY = (lcdSize >> 16) & 0xffff;
+    SetImageXSize(x);
+    SetImageYSize(y);
+    
+    
+    ClearSigWindow(1);
+    SetLCDCaptureMode(2);
+    LCDSendGraphicUrl(1, 2, 0, 20, "http://www.sigplusweb.com/SigWeb/Sign.bmp"); //240x45
+    LCDSendGraphicUrl(1, 2, 207, 4, "http://www.sigplusweb.com/SigWeb/OK.bmp");
+    LCDSendGraphicUrl(1, 2, 15, 4, "http://www.sigplusweb.com/SigWeb/CLEAR.bmp");
+    LcdRefresh(2, 0, 0, 240, 64);
+    ClearTablet();
+    KeyPadClearHotSpotList();
+    KeyPadAddHotSpot(2, 1, 10, 5, 53, 17);   //CLEAR
+    KeyPadAddHotSpot(3, 1, 197, 5, 19, 17);  //OK
+    LCDSetWindow(2, 22, 236, 40);
+    SetSigWindow(1, 0, 22, 240, 40);
 
-      const data = "These are sample terms and conditions. Please press Continue.";
+    SetLCDCaptureMode(2);
+    //while(1) {
+      if(KeyPadQueryHotSpot(2) > 0) {
+        onClear();
+      } else if (KeyPadQueryHotSpot(3) > 0) {
+        onDone(setStartDisable)
+        //break;
+      }
+    //}
+    //SetLCDCaptureMode(1);
 
-      parse(data);
 
-      LCDWriteString(0, 2, 15, 45, "9pt Arial", 15, "Continue");
-
-      KeyPadAddHotSpot(0, 1, 12, 40, 40, 15);   //Continue
-
-      ClearTablet();
-
-      LCDSetWindow(0, 0, 1, 1);
-      SetSigWindow(1, 0, 0, 1, 1);  
-      SetLCDCaptureMode(2);
-
-      scrn = 1;
-
-      while(1)
-        processPenUp();
-
-      //onSigPenUp = function ()
-      //{
-      //processPenUp();
-      //};
-
-      SetLCDCaptureMode(2);
-    }
-    else
-    {
-      alert("You do not have the appropriate signature pad plugged in to use this demo.");
-    }
-  }
-  catch (e)
-  {
+  } else{
     alert("Unable to communicate with SigWeb. Please confirm that SigWeb is installed and running on this PC.");
   }
-
 }
-
-
 
 function processPenUp()
 {
-  if(KeyPadQueryHotSpot(0) > 0)
-  {
-    ClearSigWindow(1);
-    LcdRefresh(1, 16, 45, 50, 15);
-
-    if(scrn == 1)
+  while(1){
+    if(KeyPadQueryHotSpot(2) > 0)
     {
-      ClearTablet();
-      LcdRefresh(0, 0, 0, 240, 64);
+      ClearSigWindow(1);
+      LcdRefresh(1, 10, 0, 53, 17);
 
-      const data2 = "We'll bind the signature to all the displayed text. Please press Continue.";
-
-      parse(data2);
-
-      LCDWriteString(0, 2, 15, 45, "9pt Arial", 15, "Continue");
-      LCDWriteString(0, 2, 200, 45, "9pt Arial", 15, "Back");
-
-      KeyPadAddHotSpot(1, 1, 195, 40, 20, 15);  //Back
-
-      scrn = 2;
-    }
-    else if(scrn == 2)
-    {
       LcdRefresh(2, 0, 0, 240, 64);
       ClearTablet();
-      KeyPadClearHotSpotList();
-      KeyPadAddHotSpot(2, 1, 10, 5, 53, 17);   //CLEAR
-      KeyPadAddHotSpot(3, 1, 197, 5, 19, 17);  //OK
-      LCDSetWindow(2, 22, 236, 40);
-      SetSigWindow(1, 0, 22, 240, 40);
     }
 
-    SetLCDCaptureMode(2);
-  }
-
-  if(KeyPadQueryHotSpot(1) > 0)
-  {
-    ClearSigWindow(1);
-    LcdRefresh(1, 200, 45, 25, 15);
-
-    if(scrn == 2)
+    if(KeyPadQueryHotSpot(3) > 0)
     {
-      KeyPadClearHotSpotList();
-      LcdRefresh(1, 200, 45, 25, 15);
-      ClearTablet();
-      LcdRefresh(0, 0, 0, 240, 64);
+      ClearSigWindow(1);
+      LcdRefresh(1, 210, 3, 14, 14);
 
-      const data = "These are sample terms and conditions. Please press Continue.";
-
-      parse(data);
-
-      LCDWriteString(0, 2, 15, 45, "9pt Arial", 15, "Continue");
-
-      KeyPadAddHotSpot(0, 1, 12, 40, 40, 15);   //Continue
-
-      scrn = 1;
-    }
-
-    SetLCDCaptureMode(2);
-  }
-
-  if(KeyPadQueryHotSpot(2) > 0)
-  {
-    ClearSigWindow(1);
-    LcdRefresh(1, 10, 0, 53, 17);
-
-    LcdRefresh(2, 0, 0, 240, 64);
-    ClearTablet();
-  }
-
-  if(KeyPadQueryHotSpot(3) > 0)
-  {
-    ClearSigWindow(1);
-    LcdRefresh(1, 210, 3, 14, 14);
-
-    if(NumberOfTabletPoints() > 0)
-    {
-      LcdRefresh(0, 0, 0, 240, 64);
-      LCDWriteString(0, 2, 35, 25, "9pt Arial", 15, "Signature capture complete.");
-
-      //NOW, EXTRACT THE SIGNATURE IN THE TOPAZ BIOMETRIC FORMAT -- SIGSTRING
-      //OR AS A BASE64-ENCODED PNG IMAGE
-      //OR BOTH
-
-      //********************USE THIS SECTION IF YOU WISH TO APPLY AUTOKEY TO YOUR TOPAZ SIGNATURE
-      //READ ABOUT AUTOKEY AND THE TOPAZ SIGNATURE FORMAT HERE: http://topazsystems.com/links/robustsignatures.pdf
-      //AUTOKEY IS CRITICAL TO SAVING AN eSIGN-COMPLIANT SIGNATURE
-      //AUTOKEY ONLY APPLIES TO THE TOPAZ-FORMAT SIGSTRING AND DOES NOT APPLY TO AN IMAGE OF THE SIGNATURE
-      //AUTOKEY ALLOWS THE DEVELOPER TO CRYPTOGRAPHICALLY BIND THE TOPAZ SIGNATURE TO A SET OF DATA
-      //THE PURPOSE OF THIS IS TO SHOW THAT THE SIGNATURE IS BEING APPLIED TO THE DATA YOU PASS IN USING AutoKeyAddData()
-      //IN GENERAL TOPAZ RECOMMENDS REPLICATING A TRADITIONAL 'PAPER AND PEN' APPROACH
-      //IN OTHER WORDS, IF YOU WERE TO PRINT OUT ON PAPER THE TERMS/INFORMATION THE SIGNER IS SUPPOSED TO READ AND AGREE WITH
-      //THE DATA ON THIS PAPER IS WHAT SHOULD IN WHOLE BE PASSED INTO AUTOKEYADDANSIDATA() DIGITALLY
-      //THE TOPAZ SIGSTRING IS THEN BOUND TO THIS DATA, AND CAN ONLY BE SUCCESSFULLY DECRYPTED LATER USING THIS DATA
-      //AUTOKEYADDDATA IS DEPRECATED AND REPLACED BY AUTOKEYADDANSIDATA
-      var CryptoData = "";
-      CryptoData = "This represents sample data the signer reads and is agreeing to when signing.";
-      CryptoData = CryptoData + "Concatenate all this data into a single variable.";
-      AutoKeyAddANSIData(CryptoData); //PASS THE DATA IN TO BE USED FOR AUTOKEY
-      SetEncryptionMode(2);
-      //*******END AUTOKEY SECTION
-
-      //NOTE THAT THE AUTOKEY SECTION ABOVE IS NOT REQUIRED TO RETURN A TOPAZ SIGSTRING
-      //BUT IT IS STRONGLY RECOMMENDED IF YOU REQUIRE eSIGN COMPLIANCE
-      //RETURN THE TOPAZ-FORMAT SIGSTRING
-      SetSigCompressionMode(1);
-      //alert("KEYSTRING:" + GetKeyString());
-
-      document.FORM1.sigString.value += GetSigString();
-      clearInterval(eventTmr);
-      setTimeout(endDemo, 2000);
-    }
-    else
-    {
-      LcdRefresh(0, 0, 0, 240, 64);
-      LCDWriteString(0, 2, 4, 20, "9pt Arial", 15, "Please");
-      //LCDSendGraphicUrl(0, 2, 4, 20, "http://www.sigplusweb.com/SigWeb/please.bmp");
-      ClearTablet();
-      LcdRefresh(2, 0, 0, 240, 64);
-      SetLCDCaptureMode(2);
+      if(NumberOfTabletPoints() > 0)
+      {
+        LcdRefresh(0, 0, 0, 240, 64);
+        LCDWriteString(0, 2, 35, 25, "9pt Arial", 15, "Signature capture complete.");
+      }
+      else
+      {
+        LcdRefresh(0, 0, 0, 240, 64);
+        LCDWriteString(0, 2, 4, 20, "9pt Arial", 15, "Please");
+        //LCDSendGraphicUrl(0, 2, 4, 20, "http://www.sigplusweb.com/SigWeb/please.bmp");
+        ClearTablet();
+        LcdRefresh(2, 0, 0, 240, 64);
+        SetLCDCaptureMode(2);
+        break;
+      }
     }
   }
-
   ClearSigWindow(1);
 }
 
-
-function parse(textData)
+export function onClear()
 {
-  var words = textData.split(" ");
-  var writeData = "";
-  var tempData = "";
-  var xSize = 0;
-  var ySize = 0;
-  var i = 0;
-  var yPos = 0;
+  ClearTablet();      
+  ClearSigWindow(1);
+  LcdRefresh(2, 0, 0, 240, 64);
+  ClearTablet();
+  
+  document.FORM1.sigStringData.value = "SigString: ";
+  document.FORM1.sigImageData.value = 'Base64 String: ';
+  ctx.clearRect(0,0, x, y);
+}
 
-  for(i=0; i < words.length; i++)
+export function onDone(setStartDisable)
+{
+  if(NumberOfTabletPoints() == 0)
   {
-    tempData += words[i];
-
-    xSize = LCDStringWidth("9pt Arial", tempData);
-
-    if (xSize < lcdX)
-    {
-      writeData = tempData;
-      tempData += " ";
-
-      xSize = LCDStringWidth("9pt Arial", tempData);
-
-      if (xSize < lcdX)
-      {
-        writeData = tempData;
-      }
-    }
-    else
-    {
-      ySize = LCDStringHeight("9pt Arial", tempData);
-
-      LCDWriteString(0, 2, 0, yPos, "9pt Arial", 15, writeData);
-
-      tempData = "";
-      writeData = "";
-      yPos += ySize;
-      i--;
-    }
+    alert("Please capture signature before continuing");
   }
-
-  if(writeData != "")
+  else
   {
-    LCDWriteString(0, 2, 0, yPos, "9pt Arial", 15, writeData);
+    LcdRefresh(0, 0, 0, 240, 64);
+    LCDWriteString(0, 2, 35, 25, "9pt Arial", 15, "Signature capture complete.");
+    SetTabletState(0, tmr); //deactivate connection
+
+    //NOW, EXTRACT THE SIGNATURE IN THE TOPAZ BIOMETRIC FORMAT -- SIGSTRING
+    //OR AS A BASE64-ENCODED PNG IMAGE
+    //OR BOTH
+
+    //********************USE THIS SECTION IF YOU WISH TO APPLY AUTOKEY TO YOUR TOPAZ SIGNATURE
+    //READ ABOUT AUTOKEY AND THE TOPAZ SIGNATURE FORMAT HERE: http://topazsystems.com/links/robustsignatures.pdf
+    //AUTOKEY IS CRITICAL TO SAVING AN eSIGN-COMPLIANT SIGNATURE
+    //AUTOKEY ONLY APPLIES TO THE TOPAZ-FORMAT SIGSTRING AND DOES NOT APPLY TO AN IMAGE OF THE SIGNATURE
+    //AUTOKEY ALLOWS THE DEVELOPER TO CRYPTOGRAPHICALLY BIND THE TOPAZ SIGNATURE TO A SET OF DATA
+    //THE PURPOSE OF THIS IS TO SHOW THAT THE SIGNATURE IS BEING APPLIED TO THE DATA YOU PASS IN USING AutoKeyAddData()
+    //IN GENERAL TOPAZ RECOMMENDS REPLICATING A TRADITIONAL 'PAPER AND PEN' APPROACH
+    //IN OTHER WORDS, IF YOU WERE TO PRINT OUT ON PAPER THE TERMS/INFORMATION THE SIGNER IS SUPPOSED TO READ AND AGREE WITH
+    //THE DATA ON THIS PAPER IS WHAT SHOULD IN WHOLE BE PASSED INTO AUTOKEYADDANSIDATA() DIGITALLY
+    //THE TOPAZ SIGSTRING IS THEN BOUND TO THIS DATA, AND CAN ONLY BE SUCCESSFULLY DECRYPTED LATER USING THIS DATA
+    //AUTOKEYADDDATA IS DEPRECATED AND REPLACED BY AUTOKEYADDANSIDATA
+    var CryptoData = "";
+    CryptoData = "This represents sample data the signer reads and is agreeing to when signing.";
+    CryptoData += "Concatenate all this data into a single variable.";
+    AutoKeyAddANSIData(CryptoData); //PASS THE DATA IN TO BE USED FOR AUTOKEY
+    SetEncryptionMode(2);
+    //*******END AUTOKEY SECTION
+
+    //NOTE THAT THE AUTOKEY SECTION ABOVE IS NOT REQUIRED TO RETURN A TOPAZ SIGSTRING
+    //BUT IT IS STRONGLY RECOMMENDED IF YOU REQUIRE eSIGN COMPLIANCE
+    //RETURN THE TOPAZ-FORMAT SIGSTRING
+    SetSigCompressionMode(1);
+    //alert("KEYSTRING:" + GetKeyString());
+    //document.FORM1.bioSigData.value=GetSigString();
+    document.FORM1.sigStringData.value = GetSigString();
+    //THIS RETURNS THE SIGNATURE IN TOPAZ'S OWN FORMAT WITH BIOMETRIC INFORMATION
+
+    //TO RETURN THIS SIGSTRING LATER TO A NEW WEB PAGE USING SIGWEB, REPEAT THE CODE FROM THIS FUNCTION ABOVE STARTING AFTER SetTabletState(0, tmr)
+    //BUT AT THE END USE SetSigString() INSTEAD OF GetSigString()
+    //NOTE THAT SetSigString() TAKES 2 ARGUMENTS
+    //SetSigString(str SigString, context canvas)
+
+    //TO RETURN A BASE64-ENCODED PNG IMAGE OF THE SIGNATURE
+    SetImageXSize(500);
+    SetImageYSize(100);
+    SetImagePenWidth(5);
+    GetSigImageB64(SigImageCallback); //PASS IN THE FUNCTION NAME SIGWEB WILL USE TO RETURN THE FINAL IMAGE
+    setStartDisable(false);
   }
+}
+
+
+function SigImageCallback( str )
+{
+  document.FORM1.sigImageData.value = str; //OBTAIN FINAL IMAGE HERE
+}
+
+function SigClearImageCallback( str )
+{
+  document.FORM1.sigImageData.value = ''; //OBTAIN FINAL IMAGE HERE
 }
 
 function endDemo()
 {
-  LcdRefresh(0, 0, 0, 240, 64);
-  LCDSetWindow(0, 0, 240, 64);
-  SetSigWindow(1, 0, 0, 240, 64);
-  KeyPadClearHotSpotList();
-  SetLCDCaptureMode(1);
-  SetTabletState(0, tmr);
   ClearTablet();
+  SetTabletState(0, tmr);
 }
 
 function close(){
@@ -309,6 +188,7 @@ function close(){
     endDemo();
   }
 }
+
 
 //function processPenUp()
 //{
@@ -336,56 +216,13 @@ export const listener = () => {
     else{
       alert("Unable to communicate with SigWeb. Please confirm that SigWeb is installed and running on this PC.");
     }
-  }
+  };
 
-
-
-  if(navigator.userAgent.search("Firefox") >= 0){
-    //Perform the following actions on
-    //	1. Browser Closure
-    //	2. Tab Closure
-    //	3. Tab Refresh
-    window.addEventListener("beforeunload", evt => {
-      close();
-      clearInterval(tmr);
-      clearInterval(eventTmr);
-      evt.preventDefault(); //For Firefox, needed for browser closure
-    });
-  }
-  else {
-    //Perform the following actions on
-    //	1. Browser Closure
-    //	2. Tab Closure
-    //	3. Tab Refresh
-    window.onbeforeunload = evt => {
-      close();
-      clearInterval(tmr);
-      clearInterval(eventTmr);
-      evt.preventDefault(); //For Firefox, needed for browser closure
-    };
-
-    window.addEventListener("beforeunload", evt => {
-      close();
-      clearInterval(tmr);
-      clearInterval(eventTmr);
-      evt.preventDefault(); //For Firefox, needed for browser closure
-    });
-
-    window.addEventListener("unload", evt => {
-      close();
-      clearInterval(tmr);
-      clearInterval(eventTmr);
-      evt.preventDefault(); //For Firefox, needed for browser closure
-    });
-
-    //Perform the following actions on
-    //	1. Browser Closure
-    //	2. Tab Closure
-    //	3. Tab Refresh
-    window.addEventListener("beforeunload", close());
-
-    window.addEventListener("unload", close());
-  }
+  window.onbeforeunload = function(evt){
+    close();
+    clearInterval(tmr);
+    evt.preventDefault(); //For Firefox, needed for browser closure
+  };
 }
 
 

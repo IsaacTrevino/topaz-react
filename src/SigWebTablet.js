@@ -4,14 +4,362 @@
 //
 //Last updated by Topaz Systems Inc. - 4/20/2020
 //
+var tmr;
+var eventTmr;
 
+var resetIsSupported = false;
+let lcdSize, lcdX, lcdY, scrn, ctx;
+
+
+export function startTablet(setSigCaptured)
+{
+  try
+  {
+    SetTabletState(1);
+    let retmod = TabletModelNumber();
+    SetTabletState(0);
+    if(retmod == 11 || retmod == 12 || retmod == 15)
+    {
+      ctx = document.getElementById('cnv').getContext('2d');
+      eventTmr = setInterval( SigWebEvent, 20 );
+      console.log(eventTmr)
+      tmr = SetTabletState(1, ctx, 50) || tmr;
+      SetLCDCaptureMode(2);
+      document.FORM1.sigString.value = "";
+      LcdRefresh(0, 0, 0, 240, 64);
+      SetJustifyMode(0);
+      KeyPadClearHotSpotList();
+      ClearSigWindow(1);
+      SetDisplayXSize(500);
+      SetDisplayYSize(100);
+      SetImageXSize(500);
+      SetImageYSize(100);
+      SetLCDCaptureMode(2);
+
+			/*
+			LCDSendGraphicUrl(1, 2, 0, 20, "http://www.sigplusweb.com/SigWeb/Sign.bmp");
+			LCDSendGraphicUrl(1, 2, 207, 4, "http://www.sigplusweb.com/SigWeb/OK.bmp");
+			LCDSendGraphicUrl(1, 2, 15, 4, "http://www.sigplusweb.com/SigWeb/CLEAR.bmp");
+			*/
+			LcdWriteLocalImage(1, 2, 0, 20, "/images/Sign.bmp");
+			LcdWriteLocalImage(1, 2, 207, 4, "/images/OK.bmp");
+			LcdWriteLocalImage(1, 2, 15, 4, "/images/CLEAR.bmp");
+
+      lcdSize = LCDGetLCDSize();
+      lcdX = lcdSize & 0xffff;
+      lcdY = (lcdSize >> 16) & 0xffff;
+
+      const data = "These are sample terms and conditions. Please press Continue.";
+
+      parse(data);
+
+      LCDWriteString(0, 2, 15, 45, "9pt Arial", 15, "Continue");
+
+      KeyPadAddHotSpot(0, 1, 12, 40, 40, 15);   //Continue
+
+      ClearTablet();
+
+      LCDSetWindow(0, 0, 1, 1);
+      SetSigWindow(1, 0, 0, 1, 1);  
+      SetLCDCaptureMode(2);
+
+			scrn = 1;
+			
+      onSigPenUp = () =>
+      {
+        processPenUp(setSigCaptured);
+      };
+
+      SetLCDCaptureMode(2);
+    }
+    else
+    {
+      alert("You do not have the appropriate signature pad plugged in to use this demo.");
+    }
+  }
+  catch (e)
+  {
+    alert("Unable to communicate with SigWeb. Please confirm that SigWeb is installed and running on this PC.");
+  }
+
+}
+
+
+
+function processPenUp(setSigCaptured)
+{
+  if(KeyPadQueryHotSpot(0) > 0)
+  {
+    ClearSigWindow(1);
+    LcdRefresh(1, 16, 45, 50, 15);
+
+    if(scrn == 1)
+    {
+      ClearTablet();
+      LcdRefresh(0, 0, 0, 240, 64);
+
+      const data2 = "We'll bind the signature to all the displayed text. Please press Continue.";
+
+      parse(data2);
+
+      LCDWriteString(0, 2, 15, 45, "9pt Arial", 15, "Continue");
+      LCDWriteString(0, 2, 200, 45, "9pt Arial", 15, "Back");
+
+      KeyPadAddHotSpot(1, 1, 195, 40, 20, 15);  //Back
+
+      scrn = 2;
+    }
+    else if(scrn == 2)
+    {
+      LcdRefresh(2, 0, 0, 240, 64);
+      ClearTablet();
+      KeyPadClearHotSpotList();
+      KeyPadAddHotSpot(2, 1, 10, 5, 53, 17);   //CLEAR
+      KeyPadAddHotSpot(3, 1, 197, 5, 19, 17);  //OK
+      LCDSetWindow(2, 22, 236, 40);
+      SetSigWindow(1, 0, 22, 240, 40);
+    }
+
+    SetLCDCaptureMode(2);
+  }
+
+  if(KeyPadQueryHotSpot(1) > 0)
+  {
+    ClearSigWindow(1);
+    LcdRefresh(1, 200, 45, 25, 15);
+
+    if(scrn == 2)
+    {
+      KeyPadClearHotSpotList();
+      LcdRefresh(1, 200, 45, 25, 15);
+      ClearTablet();
+      LcdRefresh(0, 0, 0, 240, 64);
+
+      const data = "These are sample terms and conditions. Please press Continue.";
+
+      parse(data);
+
+      LCDWriteString(0, 2, 15, 45, "9pt Arial", 15, "Continue");
+
+      KeyPadAddHotSpot(0, 1, 12, 40, 40, 15);   //Continue
+
+      scrn = 1;
+    }
+
+    SetLCDCaptureMode(2);
+  }
+
+  if(KeyPadQueryHotSpot(2) > 0)
+  {
+    ClearSigWindow(1);
+    LcdRefresh(1, 10, 0, 53, 17);
+
+    LcdRefresh(2, 0, 0, 240, 64);
+    ClearTablet();
+  }
+
+  if(KeyPadQueryHotSpot(3) > 0)
+  {
+    ClearSigWindow(1);
+    LcdRefresh(1, 210, 3, 14, 14);
+
+    if(NumberOfTabletPoints() > 0)
+    {
+      LcdRefresh(0, 0, 0, 240, 64);
+      LCDWriteString(0, 2, 35, 25, "9pt Arial", 15, "Signature capture complete.");
+
+      //NOW, EXTRACT THE SIGNATURE IN THE TOPAZ BIOMETRIC FORMAT -- SIGSTRING
+      //OR AS A BASE64-ENCODED PNG IMAGE
+      //OR BOTH
+
+      //********************USE THIS SECTION IF YOU WISH TO APPLY AUTOKEY TO YOUR TOPAZ SIGNATURE
+      //READ ABOUT AUTOKEY AND THE TOPAZ SIGNATURE FORMAT HERE: http://topazsystems.com/links/robustsignatures.pdf
+      //AUTOKEY IS CRITICAL TO SAVING AN eSIGN-COMPLIANT SIGNATURE
+      //AUTOKEY ONLY APPLIES TO THE TOPAZ-FORMAT SIGSTRING AND DOES NOT APPLY TO AN IMAGE OF THE SIGNATURE
+      //AUTOKEY ALLOWS THE DEVELOPER TO CRYPTOGRAPHICALLY BIND THE TOPAZ SIGNATURE TO A SET OF DATA
+      //THE PURPOSE OF THIS IS TO SHOW THAT THE SIGNATURE IS BEING APPLIED TO THE DATA YOU PASS IN USING AutoKeyAddData()
+      //IN GENERAL TOPAZ RECOMMENDS REPLICATING A TRADITIONAL 'PAPER AND PEN' APPROACH
+      //IN OTHER WORDS, IF YOU WERE TO PRINT OUT ON PAPER THE TERMS/INFORMATION THE SIGNER IS SUPPOSED TO READ AND AGREE WITH
+      //THE DATA ON THIS PAPER IS WHAT SHOULD IN WHOLE BE PASSED INTO AUTOKEYADDANSIDATA() DIGITALLY
+      //THE TOPAZ SIGSTRING IS THEN BOUND TO THIS DATA, AND CAN ONLY BE SUCCESSFULLY DECRYPTED LATER USING THIS DATA
+      //AUTOKEYADDDATA IS DEPRECATED AND REPLACED BY AUTOKEYADDANSIDATA
+      var CryptoData = "";
+      CryptoData = "This represents sample data the signer reads and is agreeing to when signing.";
+      CryptoData = CryptoData + "Concatenate all this data into a single variable.";
+      AutoKeyAddANSIData(CryptoData); //PASS THE DATA IN TO BE USED FOR AUTOKEY
+      SetEncryptionMode(2);
+      //*******END AUTOKEY SECTION
+
+      //NOTE THAT THE AUTOKEY SECTION ABOVE IS NOT REQUIRED TO RETURN A TOPAZ SIGSTRING
+      //BUT IT IS STRONGLY RECOMMENDED IF YOU REQUIRE eSIGN COMPLIANCE
+      //RETURN THE TOPAZ-FORMAT SIGSTRING
+      SetSigCompressionMode(1);
+      //alert("KEYSTRING:" + GetKeyString());
+
+      document.FORM1.sigString.value += GetSigString();
+      clearInterval(eventTmr);
+			//setTimeout(endDemo, 2000);
+			//TO RETURN A BASE64-ENCODED PNG IMAGE OF THE SIGNATURE
+			SetImageXSize(500);
+			SetImageYSize(100);
+			SetImagePenWidth(5);
+			GetSigImageB64(setSigCaptured); //PASS IN THE FUNCTION NAME SIGWEB WILL USE TO RETURN THE FINAL IMAGE
+    }
+    else
+    {
+      LcdRefresh(0, 0, 0, 240, 64);
+			//LCDSendGraphicUrl(0, 2, 4, 20, "http://www.sigplusweb.com/SigWeb/please.bmp");
+      LCDWriteString(0, 2, 4, 20, "9pt Arial", 15, "Please Complete Signature");
+      ClearTablet();
+      LcdRefresh(2, 0, 0, 240, 64);
+      SetLCDCaptureMode(2);
+    }
+  }
+  
+  ClearSigWindow(1);
+}
+
+function parse(textData)
+{
+  var words = textData.split(" ");
+  var writeData = "";
+  var tempData = "";
+  var xSize = 0;
+  var ySize = 0;
+  var i = 0;
+  var yPos = 0;
+
+  for(i=0; i < words.length; i++)
+  {
+    tempData += words[i];
+
+    xSize = LCDStringWidth("9pt Arial", tempData);
+
+    if (xSize < lcdX)
+    {
+      writeData = tempData;
+      tempData += " ";
+
+      xSize = LCDStringWidth("9pt Arial", tempData);
+
+      if (xSize < lcdX)
+      {
+        writeData = tempData;
+      }
+    }
+    else
+    {
+      ySize = LCDStringHeight("9pt Arial", tempData);
+
+      LCDWriteString(0, 2, 0, yPos, "9pt Arial", 15, writeData);
+
+      tempData = "";
+      writeData = "";
+      yPos += ySize;
+      i--;
+    }
+  }
+
+  if(writeData != "")
+  {
+    LCDWriteString(0, 2, 0, yPos, "9pt Arial", 15, writeData);
+  }
+}
+
+function endDemo()
+{
+  LcdRefresh(0, 0, 0, 240, 64);
+  LCDSetWindow(0, 0, 240, 64);
+  SetSigWindow(1, 0, 0, 240, 64);
+  KeyPadClearHotSpotList();
+  SetLCDCaptureMode(1);
+  SetTabletState(0, tmr);
+  ClearTablet();
+}
+
+function close(){
+  if(resetIsSupported){
+    Reset();
+  } else{
+    endDemo();
+  }
+}
+
+//function processPenUp()
+//{
+//ClearSigWindow(1);
+//}
+
+export const listener = () => {
+
+  console.log('listen')
+  window.onload = () => {
+
+    if(IsSigWebInstalled()){
+      console.log('installed')
+      resetIsSupported = GetResetSupported();
+      if(!resetIsSupported){
+        var sigweb_link = document.createElement("a");
+        sigweb_link.href = "https://www.topazsystems.com/software/sigweb.exe";
+        sigweb_link.innerHTML = "https://www.topazsystems.com/software/sigweb.exe";
+
+        var note = document.getElementById("sigWebVrsnNote");
+        note.innerHTML = "There is a newer version of SigWeb available here: ";
+        note.appendChild(sigweb_link);
+      }
+    }
+    else{
+      alert("Unable to communicate with SigWeb. Please confirm that SigWeb is installed and running on this PC.");
+    }
+  };
+
+  window.onbeforeunload = function(evt){
+    close();
+    clearInterval(tmr);
+    evt.preventDefault(); //For Firefox, needed for browser closure
+  };
+}
+
+
+function GetResetSupported(){
+  var minSigWebVersionResetSupport = "1.6.4.0";
+
+  if(isOlderSigWebVersionInstalled(minSigWebVersionResetSupport)){
+    console.log("Old SigWeb version installed.");
+    return false;
+  }
+  return true;
+}
+
+function isOlderSigWebVersionInstalled(cmprVer){
+  var sigWebVer = GetSigWebVersion();
+  if(sigWebVer != ""){
+    return isOlderVersion(cmprVer, sigWebVer);
+  } else{
+    return false;
+  }
+}
+
+function isOlderVersion (oldVer, newVer) {
+  const oldParts = oldVer.split('.')
+  const newParts = newVer.split('.')
+  for (var i = 0; i < newParts.length; i++) {
+    const a = parseInt(newParts[i]) || 0
+    const b = parseInt(oldParts[i]) || 0
+    if (a < b) return true
+    if (a > b) return false
+  }
+	return false;
+}
+
+/************************************************************************************************************************************************************************************ */
 var getBlobURL = (window.URL && URL.createObjectURL.bind(URL)) || (window.webkitURL && window.webkitURL.createObjectURL.bind(window.webkitURL)) || window.createObjectURL;
 var revokeBlobURL = (window.URL && URL.revokeObjectURL.bind(URL)) || (window.webkitURL && window.webkitURL.revokeObjectURL.bind(window.webkitURL)) || window.revokeObjectURL;
 
 var baseUri = makeUri();
-var	ctx;
+//var	ctx;
 
-export function IsSigWebInstalled(){
+function IsSigWebInstalled(){
 	var xhr = new XMLHttpRequest();
 	try{
 		xhr.onreadystatechange = function() {
@@ -29,13 +377,13 @@ export function IsSigWebInstalled(){
 	return (xhr.status != 404 && xhr.status != 0);
 }
 
-export function isIE() {
+function isIE() {
 
 	return ((navigator.appName == 'Microsoft Internet Explorer') || ((navigator.appName == 'Netscape') && (new RegExp("Trident/.*rv:([0-9]{1,}[\.0-9]{0,})").exec
 	(navigator.userAgent) != null)));
 }
 
-export function isChrome() {
+function isChrome() {
 	var ua = navigator.userAgent;
 	var chrome = false;
 
@@ -49,7 +397,7 @@ export function isChrome() {
 	}
 }
 
-export function makeUri() {
+function makeUri() {
 	var prot = window.location.protocol;
 	if(prot == "file:")
 	{
@@ -85,7 +433,7 @@ export function makeUri() {
 	}
 }
 
-export function SigWebcreateXHR() {
+function SigWebcreateXHR() {
 	try { return new XMLHttpRequest(); } catch (e) { }
 	try { return new window.ActiveXObject("Msxml2.XMLHTTP.6.0"); } catch (e) { }
 	try { return new window.ActiveXObject("Msxml2.XMLHTTP.3.0"); } catch (e) { }
@@ -100,7 +448,7 @@ var Count = false;
 
 
 
-export function SigWebSetProperty(prop) {
+function SigWebSetProperty(prop) {
 	var xhr = SigWebcreateXHR();
 
 	if (xhr) {
@@ -113,7 +461,7 @@ export function SigWebSetProperty(prop) {
 	return "";
 }
 
-export function SigWebSetPropertySync(prop) {
+function SigWebSetPropertySync(prop) {
 	var xhr = SigWebcreateXHR();
 
 	if (xhr) {
@@ -126,7 +474,7 @@ export function SigWebSetPropertySync(prop) {
 	return "";
 }
 
-export function SigWebSetStreamProperty(prop, strm) {
+function SigWebSetStreamProperty(prop, strm) {
 	var xhr = SigWebcreateXHR();
 
 	if (xhr) {
@@ -140,7 +488,7 @@ export function SigWebSetStreamProperty(prop, strm) {
 	return "";
 }
 
-export function SigWebSyncSetStreamProperty(prop, strm) {
+function SigWebSyncSetStreamProperty(prop, strm) {
 	var xhr = SigWebcreateXHR();
 
 	if (xhr) {
@@ -154,7 +502,7 @@ export function SigWebSyncSetStreamProperty(prop, strm) {
 	return "";
 }
 
-export function SigWebSetImageStreamProperty(prop, strm) {
+function SigWebSetImageStreamProperty(prop, strm) {
 	var xhr = SigWebcreateXHR();
 
 	if (xhr) {
@@ -168,7 +516,7 @@ export function SigWebSetImageStreamProperty(prop, strm) {
 	return "";
 }
 
-export function SigWebSetImageBlobProperty(prop, strm) {
+function SigWebSetImageBlobProperty(prop, strm) {
 	var xhr = SigWebcreateXHR();
 
 	//			var bb = new BlobBuilder();
@@ -187,7 +535,7 @@ export function SigWebSetImageBlobProperty(prop, strm) {
 	return "";
 }
 
-export function SigWebGetProperty(prop) {
+function SigWebGetProperty(prop) {
 	var xhr = SigWebcreateXHR();
 
 	if (xhr) {
@@ -205,37 +553,64 @@ export function SigWebGetProperty(prop) {
 var SigImageB64;
 
 
-//	function GetSigImageB64(callback)
-//		{
-//		var cvs = document.createElement('canvas');
-//		cvs.width = GetImageXSize();
-//		cvs.height = GetImageYSize();
-//
-//		var xhr2 = new XMLHttpRequest();
-//		xhr2.open("GET", baseUri + "SigImage/1", false);
-//		xhr2.responseType = "blob";
-//		xhr2.send(null);
-//		if (xhr2.readyState == 4 && xhr.status == 200)
-//			{
-//			var cntx = cvs.getContext('2d');
-//			var img = new Image();
-//			img.src = window.URL.createObjectURL(xhr2.response);
-//			img.onload = function ()
-//				{
-//				cntx.drawImage(img, 0, 0);
-//				var b64String = cvs.toDataURL("image/png");
-//				var loc = b64String.search("base64,");
-//				var retstring = b64String.slice(loc + 7, b64String.length);
-//				if (callback)
-//					{
-//					callback(retstring);
-//					}
-//				}
-//			}
-//		}
+	// function GetSigImageB64_custom(callback)
+	// {
+	// 	var cvs = document.createElement('canvas');
+	// 	cvs.width = GetImageXSize();
+	// 	cvs.height = GetImageYSize();
+
+	// 	var xhr2 = new XMLHttpRequest();
+	// 	xhr2.open("GET", baseUri + "SigImage/1", false);
+	// 	xhr2.responseType = "blob";
+	// 	xhr2.send(null);
+	// 	if (xhr2.readyState == 4 && xhr.status == 200)
+	// 		{
+	// 		var cntx = cvs.getContext('2d');
+	// 		var img = new Image();
+	// 		img.src = window.URL.createObjectURL(xhr2.response);
+	// 		img.onload = () =>	{
+	// 			cntx.drawImage(img, 0, 0);
+	// 			//var b64String = cvs.toDataURL("image/png");
+	// 			//var loc = b64String.search("base64,");
+	// 			//var retstring = b64String.slice(loc + 7, b64String.length);
+	// 			return img
+	// 		}
+	// 	}
+	// }
+
+	function GetSigImageB64_custom(callback)
+	{
+		var cvs = document.createElement('canvas');
+		cvs.width = GetImageXSize();
+		cvs.height = GetImageYSize();
+	
+		var xhr2 = new XMLHttpRequest();
+		xhr2.open("GET", baseUri + "SigImage/1"  + "?noCache=" + generateUUID(), true);
+		xhr2.responseType = "blob";
+		xhr2.send(null);
+		xhr2.onload = function ()
+		{
+			var cntx = cvs.getContext('2d');
+			var img = new Image();
+			//			img.src = window.URL.createObjectURL(xhr2.response);
+			img.src = getBlobURL(xhr2.response);
+			img.onload = function ()
+			{
+				cntx.drawImage(img, 0, 0);
+				//var b64String = cvs.toDataURL("image/png");
+				//var loc = b64String.search("base64,");
+				//var retstring = b64String.slice(loc + 7, b64String.length);
+				if (callback)
+				{
+					callback(img);
+				}
+			}
+		}
+	}
+	
 
 
-export function GetSigImageB64(callback )
+function GetSigImageB64(callback )
 {
 	var cvs = document.createElement('canvas');
 	cvs.width = GetImageXSize();
@@ -268,7 +643,7 @@ export function GetSigImageB64(callback )
 
 
 
-export function SigWebWaitForPenDown(callback) {
+function SigWebWaitForPenDown(callback) {
 	var xhr = SigWebcreateXHR();
 
 	if (xhr) {
@@ -285,7 +660,7 @@ export function SigWebWaitForPenDown(callback) {
 }
 
 
-export function GetSigImage(ctx) {
+function GetSigImage(ctx) {
 	var xhr2 = new XMLHttpRequest();
 	xhr2.open("GET", baseUri + "SigImage/1" + "?noCache=" + generateUUID(), true);
 	xhr2.responseType = "blob";
@@ -305,7 +680,7 @@ var EvStatus;
 var onSigPenDown;
 var onSigPenUp;
 
-export function SigWebSetDisplayTarget(obj) {
+function SigWebSetDisplayTarget(obj) {
 	ctx = obj;
 }
 
@@ -314,7 +689,7 @@ export function SigWebSetDisplayTarget(obj) {
 
 var		NumPointsLastTime = 0;
 
-export function SigWebRefresh() {
+function SigWebRefresh() {
 	var NumPoints = NumberOfTabletPoints();
 	if ( NumPoints == NumPointsLastTime )
 	{
@@ -339,7 +714,7 @@ export function SigWebRefresh() {
 }
 
 
-export function SigWebEvent() {
+function SigWebEvent() {
 	var OldEvStatus = EvStatus;
 
 	var xhr = SigWebcreateXHR();
@@ -364,7 +739,7 @@ export function SigWebEvent() {
 	}
 }
 
-export function generateUUID() {
+function generateUUID() {
 	var d = new Date().getTime();
 	if (typeof performance !== 'undefined' && typeof performance.now === 'function'){
 		d += performance.now(); //use high-precision timer if available
@@ -379,13 +754,13 @@ export function generateUUID() {
 
 var SigWebFontThreshold = 155;
 
-export function setSigWebFontThreshold(v) {
+function setSigWebFontThreshold(v) {
 	SigWebFontThreshold = v;
 }
 
 
 
-export function createLcdBitmapFromCanvas(ourCanvas, xp, yp, width, height) {
+function createLcdBitmapFromCanvas(ourCanvas, xp, yp, width, height) {
 	var canvasCtx = ourCanvas.getContext('2d');
 	var imgData = canvasCtx.getImageData(0, 0, width, height);
 	var j = 0;
@@ -415,7 +790,7 @@ export function createLcdBitmapFromCanvas(ourCanvas, xp, yp, width, height) {
 }
 
 
-export function toHex(NibVal) {
+function toHex(NibVal) {
 	switch (NibVal) {
 		case 0:
 		return "0";
@@ -452,7 +827,7 @@ export function toHex(NibVal) {
 	}
 }
 
-export function ToHexString(ByteVal) {
+function ToHexString(ByteVal) {
 	var Str = "";
 	Str += toHex((ByteVal >> 4) & 0x0f);
 	Str += toHex(ByteVal & 0x0F);
@@ -463,7 +838,7 @@ export function ToHexString(ByteVal) {
 
 
 
-export function textToTablet(x, y, height, str, fnt) {
+function textToTablet(x, y, height, str, fnt) {
 	var c = document.createElement('canvas');
 	var cntx = c.getContext('2d');
 	cntx.font = fnt;
@@ -490,7 +865,7 @@ export function textToTablet(x, y, height, str, fnt) {
 	LcdWriteImageStream(0, 2, x, y, xs, ys, Gstr);
 }
 
-export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
+function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	var Prop = "LcdWriteImage/";
 	var NewUrl = Url.replace(/\//g, "_");
 
@@ -498,14 +873,14 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function LcdWriteLocalImage(Dst, Mode, Xp, Yp, Url) {
+	function LcdWriteLocalImage(Dst, Mode, Xp, Yp, Url) {
 		var Prop = "LcdWriteImage/";
 
 		Prop = Prop + Dst + "," + Mode + "," + Xp + "," + Yp + "," + Url;
 		SigWebSetProperty(Prop);
 	}
 
-	export function LcdWriteImageStream(Dst, Mode, Xp, Yp, Xs, Ys, Url) {
+	function LcdWriteImageStream(Dst, Mode, Xp, Yp, Xs, Ys, Url) {
 		var Prop1 = "LcdWriteImageStreamParams/" + Dst + "," + Mode + "," + Xp + "," + Yp + "," + Xs + "," + Ys;
 		var Prop2 = "LcdWriteImageStream/";
 
@@ -513,7 +888,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 		SigWebSetImageStreamProperty(Prop2, Url);
 	}
 
-	export function LcdWriteImageBlob(Dst, Mode, Xp, Yp, Xs, Ys, Url) {
+	function LcdWriteImageBlob(Dst, Mode, Xp, Yp, Xs, Ys, Url) {
 		var Prop = "LcdWriteImageStream/";
 
 		Prop = Prop + Dst + "," + Mode + "," + Xp + "," + Yp + "," + Xs + "," + Ys;
@@ -522,7 +897,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 
 
 
-	export function measureText(pText, pFontSize, pStyle) {
+	function measureText(pText, pFontSize, pStyle) {
 		var lDiv = document.createElement('lDiv');
 
 		document.body.appendChild(lDiv);
@@ -549,7 +924,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 		return lResult;
 	}
 
-	export function GetSigWebVersion(){
+	function GetSigWebVersion(){
 		var prop = "SigWebVersion";
 
 		var xhr = SigWebcreateXHR();
@@ -577,7 +952,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	//
 	//			SigPlusNET.cs
 	//
-	export function GetVersionString() {
+	function GetVersionString() {
 		var Prop = "Version";
 
 		Prop = Prop;
@@ -587,7 +962,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function IsPenDown() {
+	function IsPenDown() {
 		return EvStatus & 0x01;
 	}
 
@@ -595,24 +970,24 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	//
 	//			SigPlusNETSig.cs
 	//
-	export function ClearTablet() {
+	function ClearTablet() {
 		var Prop = "ClearSignature";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function NumberOfTabletPoints() {
+	function NumberOfTabletPoints() {
 		var Prop = "TotalPoints";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	//		export function  ExportSigFile(  FileName ) {}
-	//		export function  ImportSigFile(  FileName ) {}
+	//		function  ExportSigFile(  FileName ) {}
+	//		function  ImportSigFile(  FileName ) {}
 
-	export function SetSigString(sigStr, ctx)
+	function SetSigString(sigStr, ctx)
 	{
 		var Prop = "SigString";
 
@@ -640,7 +1015,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 
 
 
-	export function GetSigString() {
+	function GetSigString() {
 		var Prop = "SigString";
 
 		Prop = Prop;
@@ -651,7 +1026,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 
 
 
-	export function SetSigCompressionMode(v) {
+	function SetSigCompressionMode(v) {
 		var Prop = "CompressionMode/";
 
 		Prop = Prop + v;
@@ -659,7 +1034,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function GetSigCompressionMode() {
+	function GetSigCompressionMode() {
 		var Prop = "CompressionMode";
 
 		Prop = Prop;
@@ -667,7 +1042,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function SetEncryptionMode(v) {
+	function SetEncryptionMode(v) {
 		var Prop = "EncryptionMode/";
 
 		Prop = Prop + v;
@@ -675,17 +1050,17 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function GetEncryptionMode() {
+	function GetEncryptionMode() {
 		var Prop = "EncryptionMode";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	//		export function  SetKey( Keydata ) {}
-	//		export function  GetKey( ) {}
+	//		function  SetKey( Keydata ) {}
+	//		function  GetKey( ) {}
 
-	export function SetKeyString(keyString) {
+	function SetKeyString(keyString) {
 		var Prop = "KeyString";
 
 		Prop = Prop;
@@ -693,7 +1068,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function GetKeyString() {
+	function GetKeyString() {
 		var Prop = "KeyString";
 
 		Prop = Prop;
@@ -704,7 +1079,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 
 
 
-	export function AutoKeyStart() {
+	function AutoKeyStart() {
 		var Prop = "AutoKeyStart";
 
 		Prop = Prop;
@@ -712,14 +1087,14 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function AutoKeyFinish() {
+	function AutoKeyFinish() {
 		var Prop = "AutoKeyFinish";
 
 		Prop = Prop;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function SetAutoKeyData(keyData) {
+	function SetAutoKeyData(keyData) {
 		var Prop = "SetAutoKeyData";
 
 		Prop = Prop;
@@ -727,7 +1102,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function AutoKeyAddData(keyData) {
+	function AutoKeyAddData(keyData) {
 		var Prop = "AutoKeyAddData";
 
 		Prop = Prop;
@@ -735,7 +1110,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 		return GetKeyString();
 	}
 
-	export function AutoKeyAddANSIData(keyData) {
+	function AutoKeyAddANSIData(keyData) {
 		var Prop = "AutoKeyAddANSIData";
 
 		Prop = Prop;
@@ -743,9 +1118,9 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 		return isASCII;
 	}
 
-	//		export function  GetKeyReceipt( ) {}
+	//		function  GetKeyReceipt( ) {}
 
-	export function GetKeyReceiptAscii() {
+	function GetKeyReceiptAscii() {
 		var Prop = "KeyReceiptAscii";
 
 		Prop = Prop;
@@ -755,9 +1130,9 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	//		export function  GetSigReceipt( ) {}
+	//		function  GetSigReceipt( ) {}
 
-	export function GetSigReceiptAscii() {
+	function GetSigReceiptAscii() {
 		var Prop = "SigReceiptAscii";
 
 		Prop = Prop;
@@ -767,14 +1142,14 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function SetTimeStamp(timeStamp) {
+	function SetTimeStamp(timeStamp) {
 		var Prop = "TimeStamp";
 
 		Prop = Prop;
 		SigWebSetStreamProperty(Prop, timeStamp);
 	}
 
-	export function GetTimeStamp() {
+	function GetTimeStamp() {
 		var Prop = "TimeStamp";
 
 		Prop = Prop;
@@ -783,7 +1158,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 		return Str.slice(1, Str.length - 1);
 	}
 
-	export function SetAnnotate(annotate) {
+	function SetAnnotate(annotate) {
 		var Prop = "Annotate";
 
 		Prop = Prop;
@@ -791,7 +1166,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function GetAnnotate() {
+	function GetAnnotate() {
 		var Prop = "Annotate";
 
 		Prop = Prop;
@@ -801,98 +1176,98 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function SetSaveSigInfo(v) {
+	function SetSaveSigInfo(v) {
 		var Prop = "SaveSigInfo/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetSaveSigInfo() {
+	function GetSaveSigInfo() {
 		var Prop = "SaveSigInfo";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetSavePressureData(v) {
+	function SetSavePressureData(v) {
 		var Prop = "SavePressureData/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetSavePressureData() {
+	function GetSavePressureData() {
 		var Prop = "SavePressureData";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetSaveTimeData(v) {
+	function SetSaveTimeData(v) {
 		var Prop = "SaveTimeData/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetSaveTimeData() {
+	function GetSaveTimeData() {
 		var Prop = "SaveTimeData";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetAntiAliasSpotSize(v) {
+	function SetAntiAliasSpotSize(v) {
 		var Prop = "AntiAliasSpotSize/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetAntiAliasSpotSize() {
+	function GetAntiAliasSpotSize() {
 		var Prop = "AntiAliasSpotSize";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetAntiAliasLineScale(v) {
+	function SetAntiAliasLineScale(v) {
 		var Prop = "AntiAliasLineScale/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetAntiAliasLineScale() {
+	function GetAntiAliasLineScale() {
 		var Prop = "AntiAliasLineScale";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function GetNumberOfStrokes() {
+	function GetNumberOfStrokes() {
 		var Prop = "NumberOfStrokes";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function GetNumPointsForStroke(v) {
+	function GetNumPointsForStroke(v) {
 		var Prop = "NumberOfPointsInStroke/";
 
 		Prop = Prop + v;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function GetPointXValue(v1, v2) {
+	function GetPointXValue(v1, v2) {
 		var Prop = "PointXValue/";
 
 		Prop = Prop + v1 + "/" + v2;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function GetPointYValue(v1, v2) {
+	function GetPointYValue(v1, v2) {
 		var Prop = "PointYValue/";
 
 		Prop = Prop + v1 + "/" + v2;
@@ -900,21 +1275,21 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function SetAntiAliasEnable(v) {
+	function SetAntiAliasEnable(v) {
 		var Prop = "AntiAliasEnable/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetAntiAliasEnable() {
+	function GetAntiAliasEnable() {
 		var Prop = "AntiAliasEnable";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetUseAmbientColors(v) {
+	function SetUseAmbientColors(v) {
 		var Prop = "UseAmbientColors/";
 
 		Prop = Prop + v;
@@ -924,34 +1299,34 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	//
 	//		SigPlusNETDisplay.cs
 	//
-	export function SetDisplayXSize(v) {
+	function SetDisplayXSize(v) {
 		var Prop = "DisplayXSize/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetDisplayXSize() {
+	function GetDisplayXSize() {
 		var Prop = "DisplayXSize";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetDisplayYSize(v) {
+	function SetDisplayYSize(v) {
 		var Prop = "DisplayYSize/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetDisplayYSize() {
+	function GetDisplayYSize() {
 		var Prop = "DisplayYSize";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
-	export function SetDisplayPenWidth(v) {
+	function SetDisplayPenWidth(v) {
 		var Prop = "DisplayPenWidth/";
 
 		Prop = Prop + v;
@@ -959,119 +1334,119 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function GetDisplayPenWidth() {
+	function GetDisplayPenWidth() {
 		var Prop = "DisplayPenWidth";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetDisplayTimeStamp(v) {
+	function SetDisplayTimeStamp(v) {
 		var Prop = "DisplayTimeStamp/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetDisplayTimeStamp() {
+	function GetDisplayTimeStamp() {
 		var Prop = "DisplayTimeStamp";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetDisplayTimeStampPosX(v) {
+	function SetDisplayTimeStampPosX(v) {
 		var Prop = "DisplayTimeStampPosX/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetDisplayTimeStampPosX() {
+	function GetDisplayTimeStampPosX() {
 		var Prop = "DisplayTimeStampPosX";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetDisplayTimeStampPosY(v) {
+	function SetDisplayTimeStampPosY(v) {
 		var Prop = "DisplayTimeStampPosY/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetDisplayTimeStampPosY() {
+	function GetDisplayTimeStampPosY() {
 		var Prop = "DisplayTimeStampPosY";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetDisplayTimeStampSize(v) {
+	function SetDisplayTimeStampSize(v) {
 		var Prop = "DisplayTimeStampSize/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetDisplayTimeStampSize() {
+	function GetDisplayTimeStampSize() {
 		var Prop = "DisplayTimeStampSize";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetDisplayAnnotate(v) {
+	function SetDisplayAnnotate(v) {
 		var Prop = "DisplayAnnotate/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetDisplayAnnotate() {
+	function GetDisplayAnnotate() {
 		var Prop = "DisplayAnnotate";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetDisplayAnnotatePosX(v) {
+	function SetDisplayAnnotatePosX(v) {
 		var Prop = "DisplayAnnotatePosX/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetDisplayAnnotatePosX() {
+	function GetDisplayAnnotatePosX() {
 		var Prop = "DisplayAnnotatePosX";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetDisplayAnnotatePosY(v) {
+	function SetDisplayAnnotatePosY(v) {
 		var Prop = "DisplayAnnotatePosY/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetDisplayAnnotatePosY() {
+	function GetDisplayAnnotatePosY() {
 		var Prop = "DisplayAnnotatePosY";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetDisplayAnnotateSize(v) {
+	function SetDisplayAnnotateSize(v) {
 		var Prop = "DisplayAnnotateSize/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetDisplayAnnotateSize() {
+	function GetDisplayAnnotateSize() {
 		var Prop = "DisplayAnnotateSize";
 
 		Prop = Prop;
@@ -1081,7 +1456,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	//
 	//		SigPlusNETImage.cs
 	//
-	//		export function  GetSigImageB64( )
+	//		function  GetSigImageB64( )
 	//			{
 	//			var xhr2 = new XMLHttpRequest();
 	//			xhr2.open("GET", baseUri + "SigImage/1", false );
@@ -1094,196 +1469,196 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	//			return null;
 	//			}
 
-	export function SetImageXSize(v) {
+	function SetImageXSize(v) {
 		var Prop = "ImageXSize/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetImageXSize() {
+	function GetImageXSize() {
 		var Prop = "ImageXSize";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetImageYSize(v) {
+	function SetImageYSize(v) {
 		var Prop = "ImageYSize/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetImageYSize() {
+	function GetImageYSize() {
 		var Prop = "ImageYSize";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetImagePenWidth(v) {
+	function SetImagePenWidth(v) {
 		var Prop = "ImagePenWidth/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetImagePenWidth() {
+	function GetImagePenWidth() {
 		var Prop = "ImagePenWidth";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetImageTimeStamp(v) {
+	function SetImageTimeStamp(v) {
 		var Prop = "ImageTimeStamp/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetImageTimeStamp() {
+	function GetImageTimeStamp() {
 		var Prop = "ImageTimeStamp";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetImageTimeStampPosX(v) {
+	function SetImageTimeStampPosX(v) {
 		var Prop = "ImageTimeStampPosX/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetImageTimeStampPosX() {
+	function GetImageTimeStampPosX() {
 		var Prop = "ImageTimeStampPosX";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetImageTimeStampPosY(v) {
+	function SetImageTimeStampPosY(v) {
 		var Prop = "ImageTimeStampPosY/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetImageTimeStampPosY() {
+	function GetImageTimeStampPosY() {
 		var Prop = "ImageTimeStampPosY";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetImageTimeStampSize(v) {
+	function SetImageTimeStampSize(v) {
 		var Prop = "ImageTimeStampSize/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetImageTimeStampSize() {
+	function GetImageTimeStampSize() {
 		var Prop = "ImageTimeStampSize";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetImageAnnotate(v) {
+	function SetImageAnnotate(v) {
 		var Prop = "ImageAnnotate/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetImageAnnotate() {
+	function GetImageAnnotate() {
 		var Prop = "ImageAnnotate";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetImageAnnotatePosX(v) {
+	function SetImageAnnotatePosX(v) {
 		var Prop = "ImageAnnotatePosX/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetImageAnnotatePosX() {
+	function GetImageAnnotatePosX() {
 		var Prop = "ImageAnnotatePosX";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetImageAnnotatePosY(v) {
+	function SetImageAnnotatePosY(v) {
 		var Prop = "ImageAnnotatePosY/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetImageAnnotatePosY() {
+	function GetImageAnnotatePosY() {
 		var Prop = "ImageAnnotatePosY";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetImageAnnotateSize(v) {
+	function SetImageAnnotateSize(v) {
 		var Prop = "ImageAnnotateSize/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetImageAnnotateSize() {
+	function GetImageAnnotateSize() {
 		var Prop = "ImageAnnotateSize";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetJustifyX(v) {
+	function SetJustifyX(v) {
 		var Prop = "JustifyX/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetJustifyX() {
+	function GetJustifyX() {
 		var Prop = "JustifyX";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetJustifyY(v) {
+	function SetJustifyY(v) {
 		var Prop = "JustifyY/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetJustifyY() {
+	function GetJustifyY() {
 		var Prop = "JustifyY";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetJustifyMode(v) {
+	function SetJustifyMode(v) {
 		var Prop = "JustifyMode/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetJustifyMode() {
+	function GetJustifyMode() {
 		var Prop = "JustifyMode";
 
 		Prop = Prop;
@@ -1293,38 +1668,38 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	//
 	//		SigPlusNETKeyPad.cs
 	//
-	export function KeyPadAddHotSpot(key, coord, xp, yp, xs, ys) {
+	function KeyPadAddHotSpot(key, coord, xp, yp, xs, ys) {
 		var Prop = "KeyPadAddHotSpot/";
 		Prop = Prop + key + "," + coord + "," + xp + "," + yp + "," + xs + "," + ys;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function KeyPadMarkHotSpot(key, coord, xp, yp, xs, ys) {
+	function KeyPadMarkHotSpot(key, coord, xp, yp, xs, ys) {
 		LCDWriteString(0, 2, xp, yp, "16pt sans-serif", 32, "+")
 		LCDWriteString(0, 2, xp + xs, yp, "16pt sans-serif", 32, "+")
 		LCDWriteString(0, 2, xp, yp + ys, "16pt sans-serif", 32, "+")
 		LCDWriteString(0, 2, xp + xs, yp + ys, "16pt sans-serif", 32, "+")
 	}
 
-	export function KeyPadQueryHotSpot(key) {
+	function KeyPadQueryHotSpot(key) {
 		var Prop = "KeyPadQueryHotSpot/";
 		Prop = Prop + key;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function KeyPadClearHotSpotList() {
+	function KeyPadClearHotSpotList() {
 		var Prop = "KeyPadClearHotSpotList";
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function SetSigWindow(coords, xp, yp, xs, ys) {
+	function SetSigWindow(coords, xp, yp, xs, ys) {
 		var Prop = "SigWindow/";
 
 		Prop = Prop + coords + "," + xp + "," + yp + "," + xs + "," + ys;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function ClearSigWindow(inside) {
+	function ClearSigWindow(inside) {
 		var Prop = "ClearSigWindow/";
 		Prop = Prop + inside;
 		SigWebSetPropertySync(Prop);
@@ -1332,7 +1707,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	//
 	//		SigPlusNETLCD.cs
 	//
-	export function SetLCDCaptureMode(v) {
+	function SetLCDCaptureMode(v) {
 		var Prop = "CaptureMode/";
 
 		Prop = Prop + v;
@@ -1340,21 +1715,21 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function GetLCDCaptureMode() {
+	function GetLCDCaptureMode() {
 		var Prop = "CaptureMode";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function LCDSetWindow(xP, yP, xS, yS) {
+	function LCDSetWindow(xP, yP, xS, yS) {
 		var Prop = "LCDSetWindow/";
 		Prop = Prop + xP + "," + yP + "," + xS + "," + yS;
 		SigWebSetPropertySync(Prop);
 	}
 
 
-	export function LCDWriteString(dest, mode, x, y, fnt, size, str) {
+	function LCDWriteString(dest, mode, x, y, fnt, size, str) {
 		var c = document.createElement('canvas');
 		var cntx = c.getContext('2d');
 		cntx.font = fnt;
@@ -1387,7 +1762,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function LCDDrawRectangle(dest, mode, x, y, xs, ys, fill) {
+	function LCDDrawRectangle(dest, mode, x, y, xs, ys, fill) {
 		var c = document.createElement('canvas');
 		var cntx = c.getContext('2d');
 
@@ -1405,7 +1780,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function LCDDrawButton(dest, mode, x, y, xs, ys, strys, fill, fnt, str) {
+	function LCDDrawButton(dest, mode, x, y, xs, ys, strys, fill, fnt, str) {
 		var c = document.createElement('canvas');
 		var cntx = c.getContext('2d');
 		cntx.font = fnt;
@@ -1434,7 +1809,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 
 
 
-	export function LCDWriteStringWindow(dest, mode, x, y, fnt, xsize, ysize, str) {
+	function LCDWriteStringWindow(dest, mode, x, y, fnt, xsize, ysize, str) {
 		var c = document.createElement('canvas');
 		var cntx = c.getContext('2d');
 		cntx.font = fnt;
@@ -1462,7 +1837,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function LCDStringWidth(fnt, str) {
+	function LCDStringWidth(fnt, str) {
 		var c = document.createElement('canvas');
 		var cntx = c.getContext('2d');
 		cntx.font = fnt;
@@ -1473,25 +1848,25 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function LCDStringHeight(fnt, str) {
+	function LCDStringHeight(fnt, str) {
 		return 16;
 	}
 
-	export function LcdRefresh(Mode, Xp, Yp, Xs, Ys) {
+	function LcdRefresh(Mode, Xp, Yp, Xs, Ys) {
 		var Prop = "LcdRefresh/";
 
 		Prop = Prop + Mode + "," + Xp + "," + Yp + "," + Xs + "," + Ys;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function LCDSendCmdString(CmdStr, ReturnCount, Result, TimeOut) {
+	function LCDSendCmdString(CmdStr, ReturnCount, Result, TimeOut) {
 		var Prop = "LcdSendCmdString/";
 
 		Prop = Prop + ReturnCount + "," + TimeOut;
 		Result = SigWebSetStreamProperty(Prop, CmdStr);
 	}
 
-	export function LCDSendCmdData(CmdStr, ReturnCount, Result, TimeOut) {
+	function LCDSendCmdData(CmdStr, ReturnCount, Result, TimeOut) {
 		var Prop = "LcdSendCmdData/";
 
 		Prop = Prop + ReturnCount + "," + TimeOut;
@@ -1499,78 +1874,78 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 /*
-	export function LCDSendGraphicCanvas(dest, mode, x, y, canvas) {
+	function LCDSendGraphicCanvas(dest, mode, x, y, canvas) {
 		var Gstr = createLcdBitmapFromCanvas(canvas, 0, 0, xs, ys)
 		LcdWriteImageStream(dest, mode, x, y, canvas.width, canvas.height, Gstr);
 	}
 */
 
-	//		export function  LCDSendWindowedGraphicCanvas(  dest, mode,  x,  y, canvas )
+	//		function  LCDSendWindowedGraphicCanvas(  dest, mode,  x,  y, canvas )
 	//			 {
 	//			 }
 
 
-	//		export function  LCDSendWindowedGraphicCanvas(  dest, mode,  x,  y,  xs,  ys, canvas )
+	//		function  LCDSendWindowedGraphicCanvas(  dest, mode,  x,  y,  xs,  ys, canvas )
 	//			{
 	//			var Gstr = createLcdBitmapFromCanvas( canvas, 0, 0, xs, ys)
 	//			LcdWriteImageStream( dest, mode, x, y, xs, ys, Gstr );
 	//			}
 
 /*
-	export function LCDSendWindowedGraphicCanvas(dest, mode, x, y, xs, ys, c, xps, yps) {
+	function LCDSendWindowedGraphicCanvas(dest, mode, x, y, xs, ys, c, xps, yps) {
 		var Gstr = createLcdBitmapFromCanvas(canvas, xps, yps, xs, ys)
 		LcdWriteImageStream(dest, mode, x, y, xs, ys, Gstr);
 	}
 */
 
 
-	export function LCDSendGraphicUrl(dest, mode, x, y, url) {
+	function LCDSendGraphicUrl(dest, mode, x, y, url) {
 		LcdWriteImage(dest, mode, x, y, url)
 	}
 
-	//		export function  LCDSendWindowedGraphicUrl(  dest, mode,  X,  Y, url )
+	//		function  LCDSendWindowedGraphicUrl(  dest, mode,  X,  Y, url )
 	//			{
 	//			}
 
-	//		export function  LCDSendWindowedGraphicUrl(  dest, mode,  x,  y,  xs,  ys, url )
+	//		function  LCDSendWindowedGraphicUrl(  dest, mode,  x,  y,  xs,  ys, url )
 	//			{
 	//			LcdWriteImageStream(dest, mode, x, y, xs, ys, url);
 	//			}
 /*
-	export function LCDSendWindowedGraphicUrl(dest, mode, x, y, xse, yse, url, xps, yps) {
+	function LCDSendWindowedGraphicUrl(dest, mode, x, y, xse, yse, url, xps, yps) {
 		LcdWriteImageStream(dest, mode, x, y, xs, ys, url);
 	}
 */
 
-	//		export function  LCDSendGraphic(  Dest,  Mode,  XPos,  YPos,  ImageFileName ) {}
-	//		export function  LCDSendGraphicURL(  Dest,  Mode,  XPos,  YPos,  URL ) {}
+	//		function  LCDSendGraphic(  Dest,  Mode,  XPos,  YPos,  ImageFileName ) {}
+	//		function  LCDSendGraphicURL(  Dest,  Mode,  XPos,  YPos,  URL ) {}
 
-	export function LCDClear() {
+	function LCDClear() {
 		var Prop = "LcdClear";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function LCDSetTabletMap(LCDType, LCDXSize, LCDYSize, LCDXStart, LCDYStart, LCDXStop, LCDYStop) {
+	function LCDSetTabletMap(LCDType, LCDXSize, LCDYSize, LCDXStart, LCDYStart, LCDXStop, LCDYStop) {
 	}
 
 
-	export function LCDSetPixelDepth(v) {
+	function LCDSetPixelDepth(v) {
 		var Prop = "LcdSetPixelDepth/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function LCDGetLCDSize() {
+	function LCDGetLCDSize() {
 		var Prop = "LcdGetLcdSize";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 /*
-	export function LCDSetCompressionMode(NewMode) {
+	function LCDSetCompressionMode(NewMode) {
 		var Prop = "LcdCompressionMode/";
 
 		Prop = Prop + v;
@@ -1578,14 +1953,14 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 */
 
-	export function LCDGetCompressionMode() {
+	function LCDGetCompressionMode() {
 		var Prop = "LcdCompressionMode";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 /*
-	export function LCDSetZCompressionMode(NewMode) {
+	function LCDSetZCompressionMode(NewMode) {
 		var Prop = "LcdZCompressionMode/";
 
 		Prop = Prop + v;
@@ -1593,7 +1968,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 */
 
-	export function LCDGetZCompressionMode() {
+	function LCDGetZCompressionMode() {
 		var Prop = "LcdZCompressionMode";
 
 		Prop = Prop;
@@ -1604,14 +1979,14 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	//
 
 
-	export function SetRealTabletState(v) {
+	function SetRealTabletState(v) {
 		var Prop = "TabletState/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetTabletState() {
+	function GetTabletState() {
 		var Prop = "TabletState";
 
 		Prop = Prop;
@@ -1620,161 +1995,161 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 
 
 
-	export function SetTabletLogicalXSize(v) {
+	function SetTabletLogicalXSize(v) {
 		var Prop = "TabletLogicalXSize/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetTabletLogicalXSize() {
+	function GetTabletLogicalXSize() {
 		var Prop = "TabletLogicalXSize";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function GetTabletLogicalYSize() {
+	function GetTabletLogicalYSize() {
 		var Prop = "TabletLogicalYSize";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetTabletLogicalYSize(v) {
+	function SetTabletLogicalYSize(v) {
 		var Prop = "TabletLogicalYSize/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function SetTabletXStart(v) {
+	function SetTabletXStart(v) {
 		var Prop = "TabletXStart/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetTabletXStart() {
+	function GetTabletXStart() {
 		var Prop = "TabletXStart";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetTabletYStart(v) {
+	function SetTabletYStart(v) {
 		var Prop = "TabletYStart/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetTabletYStart() {
+	function GetTabletYStart() {
 		var Prop = "TabletYStart";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetTabletXStop(v) {
+	function SetTabletXStop(v) {
 		var Prop = "TabletXStop/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetTabletXStop() {
+	function GetTabletXStop() {
 		var Prop = "TabletXStop";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetTabletYStop(v) {
+	function SetTabletYStop(v) {
 		var Prop = "TabletYStop/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetTabletYStop() {
+	function GetTabletYStop() {
 		var Prop = "TabletYStop";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetTabletFilterPoints(v) {
+	function SetTabletFilterPoints(v) {
 		var Prop = "TabletFilterPoints/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetTabletFilterPoints() {
+	function GetTabletFilterPoints() {
 		var Prop = "TabletFilterPoints";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetTabletTimingAdvance(v) {
+	function SetTabletTimingAdvance(v) {
 		var Prop = "TabletTimingAdvance/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetTabletTimingAdvance() {
+	function GetTabletTimingAdvance() {
 		var Prop = "TabletTimingAdvance";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetTabletComPort(v) {
+	function SetTabletComPort(v) {
 		var Prop = "TabletComPort/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetTabletComPort() {
+	function GetTabletComPort() {
 		var Prop = "TabletComPort";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetTabletBaudRate(v) {
+	function SetTabletBaudRate(v) {
 		var Prop = "TabletBaudRate/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetTabletBaudRate() {
+	function GetTabletBaudRate() {
 		var Prop = "TabletBaudRate";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetTabletRotation(v) {
+	function SetTabletRotation(v) {
 		var Prop = "TabletRotation/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetTabletRotation() {
+	function GetTabletRotation() {
 		var Prop = "TabletRotation";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetTabletType(v) {
+	function SetTabletType(v) {
 		var Prop = "TabletType/";
 
 		Prop = Prop + v;
@@ -1782,182 +2157,182 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function GetTabletType() {
+	function GetTabletType() {
 		var Prop = "TabletType";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetServerTabletType(v) {
+	function SetServerTabletType(v) {
 		var Prop = "ServerTabletType/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetServerTabletType() {
+	function GetServerTabletType() {
 		var Prop = "ServerTabletType";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetTabletComTest(v) {
+	function SetTabletComTest(v) {
 		var Prop = "TabletComTest/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetTabletComTest() {
+	function GetTabletComTest() {
 		var Prop = "TabletComTest";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetTabletResolution(v) {
+	function SetTabletResolution(v) {
 		var Prop = "TabletResolution/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetTabletResolution() {
+	function GetTabletResolution() {
 		var Prop = "TabletResolution";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function TabletConnectQuery() {
+	function TabletConnectQuery() {
 		var Prop = "TabletConnectQuery";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function TabletModelNumber() {
+	function TabletModelNumber() {
 		var Prop = "TabletModelNumber";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function TabletSerialNumber() {
+	function TabletSerialNumber() {
 		var Prop = "TabletSerialNumber";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetTabletPortPath(v) {
+	function SetTabletPortPath(v) {
 		var Prop = "TabletPortPath/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function SetTabletLocalIniFilePath(v) {
+	function SetTabletLocalIniFilePath(v) {
 		var Prop = "TabletLocalIniFilePath/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function SetTabletModel(v) {
+	function SetTabletModel(v) {
 		var Prop = "TabletModel/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function SetSerialPortCloseDelay(v) {
+	function SetSerialPortCloseDelay(v) {
 		var Prop = "SerialPortCloseDelay/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetSerialPortCloseDelay() {
+	function GetSerialPortCloseDelay() {
 		var Prop = "SerialPortCloseDelay";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function EnableTabletEncryption() {
+	function EnableTabletEncryption() {
 		var Prop = "EnableTabletEncryption";
 
 		Prop = Prop;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function SetTabletEncryptionMode(hmode, tmode) {
+	function SetTabletEncryptionMode(hmode, tmode) {
 		var Prop = "TabletEncryptionMode/";
 
 		Prop = Prop + hmode + "," + tmode;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function SetMaxLogFileSize(v) {
+	function SetMaxLogFileSize(v) {
 		var Prop = "MaxLogFileSize/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetSigSockServerPath() {
+	function GetSigSockServerPath() {
 		var Prop = "SigSockServerPath";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function GetSigSockClientName() {
+	function GetSigSockClientName() {
 		var Prop = "SigSockClientName";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function GetSigSockPortNumber() {
+	function GetSigSockPortNumber() {
 		var Prop = "SigSockPortNumber";
 
 		Prop = Prop;
 		return SigWebGetProperty(Prop);
 	}
 
-	export function SetSigSockServerPath(v) {
+	function SetSigSockServerPath(v) {
 		var Prop = "SigSockServerPath/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function SetSigSockClientName(v) {
+	function SetSigSockClientName(v) {
 		var Prop = "SigSockClientName/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function SetPortNumber(v) {
+	function SetPortNumber(v) {
 		var Prop = "PortNumber/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function SetSigSockPortNumber(v) {
+	function SetSigSockPortNumber(v) {
 		var Prop = "SigSockPortNumber/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function GetFirmwareRevision() {
+	function GetFirmwareRevision() {
 		var Prop = "FirmwareRevision";
 
 		Prop = Prop;
@@ -1965,7 +2340,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function SetTabletData(sigStr) {
+	function SetTabletData(sigStr) {
 		var Prop = "TabletData";
 
 		Prop = Prop;
@@ -1974,7 +2349,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 
 
 
-	export function GetTabletData() {
+	function GetTabletData() {
 		var Prop = "TabletData";
 
 		Prop = Prop;
@@ -1984,14 +2359,14 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function OpenTablet(v) {
+	function OpenTablet(v) {
 		var Prop = "OpenTablet/";
 
 		Prop = Prop + v;
 		SigWebSetPropertySync(Prop);
 	}
 
-	export function CloseTablet() {
+	function CloseTablet() {
 		var Prop = "CloseTablet";
 
 		Prop = Prop;
@@ -1999,7 +2374,7 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function ResetParameters() {
+	function ResetParameters() {
 		var Prop = "ResetParameters";
 
 		Prop = Prop;
@@ -2007,18 +2382,18 @@ export function LcdWriteImage(Dst, Mode, Xp, Yp, Url) {
 	}
 
 
-	export function testRawData() {
+	function testRawData() {
 		OpenTablet(1);
 		var Str1 = GetTabletData();
 		CloseTablet();
 	}
 
-	export function Reset() {
+	function Reset() {
 		var Prop = "Reset";
 		SigWebSetProperty(Prop);
 	}
 
-	export function SetTabletState(v, ctx, tv)
+	function SetTabletState(v, ctx, tv)
 	{
 		var delay;
 
